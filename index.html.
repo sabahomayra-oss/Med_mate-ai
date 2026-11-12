@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedMate AI</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f3fa;
+  color: #29243b;
+}
+header {
+  background: #55418b;
+  color: white;
+  padding: 24px 18px;
+  border-radius: 0 0 24px 24px;
+}
+header h1 { margin: 0 0 6px; }
+main { max-width: 650px; margin: auto; padding: 18px; }
+.card {
+  background: white;
+  border-radius: 17px;
+  padding: 19px;
+  margin-bottom: 15px;
+  box-shadow: 0 3px 14px #24134b0c;
+}
+h2 { font-size: 18px; margin-top: 0; }
+input, select, button {
+  width: 100%;
+  padding: 13px;
+  margin: 6px 0;
+  border: 1px solid #ddd6eb;
+  border-radius: 10px;
+  font-size: 15px;
+}
+button {
+  background: #654da0;
+  color: white;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+button.secondary { background: #eae5f4; color: #44336e; }
+button:disabled { opacity: .5; }
+.timer {
+  font-size: 48px;
+  font-weight: bold;
+  text-align: center;
+  margin: 22px 0;
+  font-variant-numeric: tabular-nums;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.stat {
+  background: #f2eff9;
+  border-radius: 12px;
+  padding: 15px;
+}
+.stat strong { display: block; font-size: 25px; margin-top: 7px; }
+.small { color: #777; font-size: 13px; }
+.session {
+  border-bottom: 1px solid #eee;
+  padding: 10px 0;
+}
+footer { text-align: center; color: #888; padding: 20px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌸 MedMate AI</h1>
+  <div>Your personal study companion</div>
+  <p id="date"></p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>📚 Start studying</h2>
+    <select id="subject">
+      <option>Biology</option>
+      <option>Physics</option>
+      <option>Chemistry</option>
+      <option>Higher Mathematics</option>
+      <option>English</option>
+      <option>ICT</option>
+      <option>Other</option>
+    </select>
+    <input id="topic" placeholder="Topic (e.g. Cell Wall)">
+    <div class="timer" id="timer">00:00:00</div>
+    <button id="start" onclick="startTimer()">▶ Start studying</button>
+    <button class="secondary" id="pause" onclick="pauseTimer()" disabled>⏸ Pause</button>
+    <button class="secondary" onclick="finishSession()">✓ Finish session</button>
+    <p class="small" id="status">Ready when you are!</p>
+  </section>
+
+  <section class="card">
+    <h2>🏆 Your progress</h2>
+    <div class="stats">
+      <div class="stat">Today's study time<strong id="today">0 min</strong></div>
+      <div class="stat">Total study time<strong id="total">0 min</strong></div>
+      <div class="stat">Your XP ⭐<strong id="xp">0</strong></div>
+      <div class="stat">Sessions<strong id="sessions">0</strong></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📖 Recent sessions</h2>
+    <div id="history" class="small">No sessions yet. Start your first one!</div>
+  </section>
+</main>
+
+<footer>MedMate AI · Version 1.0 · Built for your goals 💜</footer>
+
+<script>
+let seconds = 0;
+let interval = null;
+let running = false;
+
+const $ = id => document.getElementById(id);
+
+$("date").textContent = new Date().toDateString();
+
+function formatTime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return [h,m,sec].map(x => String(x).padStart(2,"0")).join(":");
+}
+
+function updateTimer() {
+  $("timer").textContent = formatTime(seconds);
+}
+
+function startTimer() {
+  if (running) return;
+  running = true;
+  $("start").disabled = true;
+  $("pause").disabled = false;
+  $("status").textContent = "Study session in progress 💜";
+  interval = setInterval(() => {
+    seconds++;
+    updateTimer();
+  }, 1000);
+}
+
+function pauseTimer() {
+  clearInterval(interval);
+  running = false;
+  $("start").disabled = false;
+  $("pause").disabled = true;
+  $("status").textContent = "Session paused.";
+}
+
+function getData() {
+  try {
+    return JSON.parse(localStorage.getItem("medmateData")) ||
+      { sessions: [], xp: 0 };
+  } catch {
+    return { sessions: [], xp: 0 };
+  }
+}
+
+function finishSession() {
+  pauseTimer();
+
+  if (seconds < 60) {
+    $("status").textContent = "Study for at least 1 minute to save a session.";
+    return;
+  }
+
+  const data = getData();
+  const minutes = Math.floor(seconds / 60);
+
+  data.sessions.unshift({
+    subject: $("subject").value,
+    topic: $("topic").value || "General study",
+    seconds: seconds,
+    date: new Date().toLocaleDateString()
+  });
+
+  data.xp += minutes;
+
+  localStorage.setItem("medmateData", JSON.stringify(data));
+
+  seconds = 0;
+  updateTimer();
+  $("status").textContent = "Session saved! +" + minutes + " XP 🎉";
+  render();
+}
+
+function render() {
+  const data = getData();
+  const today = new Date().toLocaleDateString();
+
+  const todaySeconds = data.sessions
+    .filter(s => s.date === today)
+    .reduce((sum,s) => sum + s.seconds, 0);
+
+  const totalSeconds = data.sessions
+    .reduce((sum,s) => sum + s.seconds, 0);
+
+  $("today").textContent = Math.floor(todaySeconds / 60) + " min";
+  $("total").textContent = Math.floor(totalSeconds / 60) + " min";
+  $("xp").textContent = data.xp;
+  $("sessions").textContent = data.sessions.length;
+
+  $("history").innerHTML = data.sessions.length
+    ? data.sessions.slice(0,10).map(s =>
+      `<div class="session">
+        <strong>${escapeHTML(s.subject)}</strong> · ${escapeHTML(s.topic)}
+        <br>${Math.floor(s.seconds/60)} minutes · ${escapeHTML(s.date)}
+      </div>`
+    ).join("")
+    : "No sessions yet. Start your first one!";
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;",
+    '"':"&quot;", "'":"&#39;"
+  }[c]));
+}
+
+updateTimer();
+render();
+</script>
+</body>
+</html>
